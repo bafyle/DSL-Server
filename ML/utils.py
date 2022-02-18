@@ -85,3 +85,35 @@ def predict_dslr(model,video_keypoints):
     res = model.predict(test)
     result=actions[np.argmax(res[0])]
     return result, np.amax(res)
+
+
+
+def predict_video(temp_file_path, model):
+    with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
+        cap = cv2.VideoCapture(temp_file_path)
+        video_keypoints = list()
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if total >= 30:
+            targetFrames = 30
+            for _ in range(targetFrames):
+                _, frame = cap.read()
+                _, results = mediapipe_detection(frame, holistic)
+                video_keypoints.append(extract_keypoints(results))
+            prediction, predict_proba = predict_dslr(model, video_keypoints)
+            cap.release()
+            return True, prediction, predict_proba
+        else:
+            cap.release()
+            return False, "attached video duration is short"
+
+
+def predict_image(temp_file_path, model):
+    frame = cv2.imread(temp_file_path)
+    keypoints = []
+    with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
+        _, results = mediapipe_detection(frame, holistic)
+        keypoints.append(extract_keypoints(results))
+        keypoints = keypoints * 30
+        prediction, predict_proba = predict_dslr(model, keypoints)
+    return True, prediction, predict_proba
+
