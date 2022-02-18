@@ -8,5 +8,5 @@ SECURE_HSTS_PRELOAD = True
 
 
 ALLOWED_HOSTS = [
-    'Add Host here', '127.0.0.1'
+    '127.0.0.1',
 ]
