@@ -1,7 +1,7 @@
 import magic
-import tempfile
-from django.http import HttpRequest
-from django.http import JsonResponse
+import uuid
+from django.http import HttpRequest, JsonResponse
+from django.conf import settings
 from .utils import (
     getModel,
     mediapipe_detection,
@@ -18,20 +18,18 @@ def upload_file_view(request: HttpRequest):
 
     if request.method == "POST":
         if (uploaded_file:=request.FILES.get("file")):
-            temp_file_path = "./media" + tempfile.NamedTemporaryFile().name
+            temp_file_path = settings.MEDIA_ROOT + str(uuid.uuid4())
             uploaded_file_type, extension = magic.from_buffer(uploaded_file.read(2048), mime=True).split("/")
-            print(temp_file_path)
-            print(extension)
             if uploaded_file_type == "video":
                 with open(temp_file_path, "wb") as new_file:
                     for line in uploaded_file:
                         new_file.write(line)
                         new_file.flush()
+                new_file.close()
                 with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
                     cap = cv2.VideoCapture(temp_file_path)
                     video_keypoints = list()
                     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                    print(total)
                     if total >= 30:
                         targetFrames = 30
                         for _ in range(targetFrames):
@@ -44,10 +42,12 @@ def upload_file_view(request: HttpRequest):
                 
             elif uploaded_file_type == "image":
                 pass
-
-            if os.path.exists(temp_file_path):
+            cap.release()
+            try:
                 os.remove(temp_file_path)
-            
+            except (FileNotFoundError, PermissionError) as e:
+                print(e)
+                
             return JsonResponse({"message":"good", "prediction":prediction, "predict_proba": str(predict_proba)}) # return the prediction to the client
         return JsonResponse({"message":"bad", "description":"no files attached"})
     return JsonResponse({"message": "bad", "description":"method not allowed"}, status=405)
