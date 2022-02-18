@@ -43,7 +43,7 @@ INSTALLED_APPS = [
 
     ## My apps
     'chat',
-    'model',
+    'ML',
 ]
 
 MIDDLEWARE = [
