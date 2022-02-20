@@ -25,7 +25,7 @@ def upload_media_view(request: HttpRequest):
         return JsonResponse({"message":"bad", "description":"no media attached"})
     
     temp_file_name = str(uuid.uuid4())
-    temp_file_path = os.path.join(settings.MEDIA_ROOT, temp_file_name)
+    temp_file_path = settings.MEDIA_ROOT + temp_file_name
 
     uploaded_file_type = magic.from_buffer(uploaded_file.read(2048), mime=True).split("/")[0]
 
