@@ -15,6 +15,8 @@ import logging
 
 MODEL = getModel(os.path.join(settings.BASE_DIR, "model_files/DSL_Best_Validation_99T_99V.h5"))
 
+file_type_prediction_dict = {"video": predict_video, "image": predict_image}
+
 def upload_media_view(request: HttpRequest):
     if request.method != "POST":
         return JsonResponse({"message": "bad", "description":"method not allowed"}, status=405)
@@ -23,15 +25,19 @@ def upload_media_view(request: HttpRequest):
         return JsonResponse({"message":"bad", "description":"no media attached"})
     
     temp_file_name = str(uuid.uuid4())
-    temp_file_path = settings.MEDIA_ROOT + temp_file_name
+    temp_file_path = os.path.join(settings.MEDIA_ROOT, temp_file_name)
+
     uploaded_file_type = magic.from_buffer(uploaded_file.read(2048), mime=True).split("/")[0]
+
+    if (prediction_function := file_type_prediction_dict.get(uploaded_file_type)) is None:
+        return JsonResponse({"message":"bad", "description":"corrupted or unsupported file"})
+        
     with open(temp_file_path, "wb") as new_file:
         for line in uploaded_file:
             new_file.write(line)
             new_file.flush()
     
-    output = predict_video(temp_file_path, MODEL) if uploaded_file_type == "video" \
-        else predict_image(temp_file_path, MODEL)
+    output = prediction_function(temp_file_path, MODEL)
     
     try:
         os.remove(temp_file_path)
