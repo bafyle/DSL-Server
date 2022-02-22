@@ -8,15 +8,15 @@ from django.conf import settings
 from django.shortcuts import render
 from .utils import (
     getModel,
-    predict_image,
-    predict_video
+    predict_for_single_image,
+    predict_for_single_video_file
 )
 import os
 import logging
 
 MODEL = getModel(os.path.join(settings.BASE_DIR, "model_files/DSL_Best_Validation_99T_99V.h5"))
 
-file_type_prediction_dict = {"video": predict_video, "image": predict_image}
+file_type_prediction_dict = {"video": predict_for_single_video_file, "image": predict_for_single_image}
 
 def upload_media_view(request: HttpRequest):
     if request.method != "POST":

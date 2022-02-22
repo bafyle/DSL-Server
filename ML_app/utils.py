@@ -1,27 +1,14 @@
 import cv2
 import numpy as np
-import os
 import mediapipe as mp
-import glob
-from typing import List
-import tensorflow as tf
-from tensorflow import keras
-from keras import Sequential, layers
-from keras.layers import Dense, LSTM, Dropout, GRU
 from keras.models import load_model
 
-
 actions = [
-    'hello',
-    'howAre',
-    'love',
-    'mask',
-    'no',
-    'please',
-    'sorry',
-    'thanks',
-    'wear',
-    'you'
+    'hello','howAre',
+    'love','mask',
+    'no','please',
+    'sorry','thanks',
+    'wear','you'
 ]
 
 mp_holistic = mp.solutions.holistic
@@ -73,10 +60,10 @@ def extract_keypoints(results):
 #     return np.concatenate([pose, face, lh, rh])
     return np.concatenate([pose, lh, rh])
 
+
 def getModel(modelPath):
     model = load_model(modelPath)
     return model
-
 
 
 def predict_dslr(model,video_keypoints):
@@ -87,8 +74,16 @@ def predict_dslr(model,video_keypoints):
     return result, np.amax(res)
 
 
+def predict_for_realtime(frames: list, model):
+    video_keypoints = list()
+    with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
+        for frame in frames:
+            _, results = mediapipe_detection(frame, holistic)
+            video_keypoints.append(extract_keypoints(results))
+    return predict_dslr(model, video_keypoints)
 
-def predict_video(temp_file_path, model):
+
+def predict_for_single_video_file(temp_file_path, model):
     with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
         cap = cv2.VideoCapture(temp_file_path)
         video_keypoints = list()
@@ -107,7 +102,7 @@ def predict_video(temp_file_path, model):
             return False, "attached video duration is short"
 
 
-def predict_image(temp_file_path, model):
+def predict_for_single_image(temp_file_path, model):
     frame = cv2.imread(temp_file_path)
     keypoints = []
     with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:

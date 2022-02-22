@@ -35,20 +35,14 @@ class StreamConsumer(AsyncWebsocketConsumer):
         
         if len(self.buffer) == 30:
 
-            video_keypoints = list()
-            with utils.mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
-                for frame in self.buffer:
-                    _, results = utils.mediapipe_detection(frame, holistic)
-                    video_keypoints.append(utils.extract_keypoints(results))
-            prediction, predict_proba = utils.predict_dslr(MODEL, video_keypoints)
+            prediction, predict_proba = utils.predict_for_realtime(self.buffer, MODEL)
 
             await self.send(text_data=json.dumps({
                 'prediction': prediction,
                 "predict_proba":str(predict_proba)
             }))
-            video_keypoints.clear()
             self.buffer.clear()
-    
+
 
     def decode_opencv_image(self, img_stream, cv2_img_flag=0):
         img_array = np.asarray(bytearray(img_stream), dtype=np.uint8)
