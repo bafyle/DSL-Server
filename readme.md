@@ -7,16 +7,17 @@ For now, the server has only two apps, chat app which is an example for django c
 chat is disabled and will be removed in the future
 
 ### Server endpoints
-This project has only one endpoint (for now) which is:
+This project has two endpoints (for now) which are:
 ~~~
 http://host:port/api/upload-media/
+ws://host:port/real-time/
 ~~~
-It's used to upload an image or a video to the server and the response of it is the the prediction of the model or and error message, All in JSON format.
+http endpoints used to upload an image or a video to the server and the response of it is the the prediction of the model or and error message, All in JSON format.
 
+websocket endpoint is used for sending a stream of frames from opencv and send back to the client the prediction.
 
 ### Future Thinking
- * Make all clients send and receiver data using websocket protocol (Django Channels) to avoid any delays from the prediction process and to not delay the request-response cycle.
- * Send the prediction output in JSON format.
+--
 
 
 ### Todo
