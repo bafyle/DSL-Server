@@ -5,6 +5,7 @@ from django.http import (
     JsonResponse
 )
 from django.conf import settings
+from django.shortcuts import render
 from .utils import (
     getModel,
     predict_image,
@@ -49,4 +50,5 @@ def upload_media_view(request: HttpRequest):
     return JsonResponse({"message":"bad", "description":output[1]})
 
 
-
+def stream_view(request: HttpRequest):
+    return render(request, "ML_app/stream_demo.html")

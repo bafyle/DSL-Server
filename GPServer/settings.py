@@ -37,11 +37,11 @@ INSTALLED_APPS = [
 
     ## third party apps
 
-    # 'channels',
+    'channels',
     # 'rest_framework',
 
     ## My apps
-    'chat',
+    # 'chat',
     'ML_app',
 ]
 
@@ -74,7 +74,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'GPServer.wsgi.application'
-# ASGI_APPLICATION = 'GPServer.asgi.application'
+ASGI_APPLICATION = 'GPServer.asgi.application'
 
 # CHANNEL_LAYERS = {
 #     'default': {
