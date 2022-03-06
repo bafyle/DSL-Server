@@ -2,14 +2,14 @@ import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 
 import cv2
-from . import utils
-import os
+from .utils import(
+    MODEL,
+    predict_for_realtime
+) 
 import numpy as np
-from django.conf import settings
 
-MODEL = utils.getModel(os.path.join(settings.BASE_DIR, "model_files/annDSL_Best_ValidationDelete.h5"))
 
-class StreamConsumer(AsyncWebsocketConsumer):
+class RealtimeConsumer(AsyncWebsocketConsumer):
 
     # handshaking for incoming connection
     async def connect(self):
@@ -37,7 +37,7 @@ class StreamConsumer(AsyncWebsocketConsumer):
         
         if len(self.buffer) == 30:
 
-            prediction, predict_proba = utils.predict_for_realtime(self.buffer, MODEL)
+            prediction, predict_proba = predict_for_realtime(self.buffer, MODEL)
 
             await self.send(text_data=json.dumps({
                 'prediction': prediction,
@@ -46,7 +46,7 @@ class StreamConsumer(AsyncWebsocketConsumer):
             self.buffer.clear()
 
 
-    def decode_opencv_image(self, img_stream, cv2_img_flag=1):
+    def decode_opencv_image(self, img_stream, cv2_img_flag=cv2.IMREAD_UNCHANGED):
         img_array = np.asarray(bytearray(img_stream), dtype=np.uint8)
         data = cv2.imdecode(img_array, cv2_img_flag)
         return data

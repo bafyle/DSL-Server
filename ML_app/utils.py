@@ -2,8 +2,15 @@ import cv2
 import numpy as np
 import mediapipe as mp
 from keras.models import load_model
+import os
+from django.conf import settings
 
-actions = [
+def getModel(modelPath):
+    model = load_model(modelPath)
+    return model
+
+MODEL = getModel(os.path.join(settings.BASE_DIR, "model_files/annDSL_Best_ValidationDelete.h5"))
+ACTIONS = [
     'Hello','HowAre',
     'Love','Mask',
     'No','Please',
@@ -52,38 +59,35 @@ def draw_styled_landmarks(image, results):
                              mp_drawing.DrawingSpec(color=(245,66,230), thickness=2, circle_radius=2)
                              ) 
 
-def extract_keypoints(results):
+def extract_keypoints_for_rnn_model(results):
+    pose = np.array([[res.x, res.y, res.z, res.visibility] for res in results.pose_landmarks.landmark]).flatten() if results.pose_landmarks else np.zeros(33*4)
+    # face = np.array([[res.x, res.y, res.z] for res in results.face_landmarks.landmark]).flatten() if results.face_landmarks else np.zeros(468*3)
+    lh = np.array([[res.x, res.y, res.z] for res in results.left_hand_landmarks.landmark]).flatten() if results.left_hand_landmarks else np.zeros(21*3)
+    rh = np.array([[res.x, res.y, res.z] for res in results.right_hand_landmarks.landmark]).flatten() if results.right_hand_landmarks else np.zeros(21*3)
+    # return np.concatenate([pose, face, lh, rh])
+    return np.concatenate([pose, lh, rh])
+
+
+def extract_keypoints_for_ann_model(results):
     try:
         nose_x=results.pose_landmarks.landmark[0].x
         nose_y=results.pose_landmarks.landmark[0].y
     except:
         nose_x=0
         nose_y=0
-        
     pose = np.array([[res.x-nose_x, res.y-nose_y, res.z, res.visibility] for res in results.pose_landmarks.landmark]).flatten() if results.pose_landmarks else np.zeros(33*4)
     # face = np.array([[res.x-nose_x, res.y-nose_y, res.z] for res in results.face_landmarks.landmark]).flatten() if results.face_landmarks else np.zeros(468*3)
     lh = np.array([[res.x-nose_x, res.y-nose_y, res.z] for res in results.left_hand_landmarks.landmark]).flatten() if results.left_hand_landmarks else np.zeros(21*3)
     rh = np.array([[res.x-nose_x, res.y-nose_y, res.z] for res in results.right_hand_landmarks.landmark]).flatten() if results.right_hand_landmarks else np.zeros(21*3)
-#     return np.concatenate([pose, face, lh, rh])
+    # return np.concatenate([pose, face, lh, rh])
     return np.concatenate([pose, lh, rh])
-#     pose = np.array([[res.x, res.y, res.z, res.visibility] for res in results.pose_landmarks.landmark]).flatten() if results.pose_landmarks else np.zeros(33*4)
-# #     face = np.array([[res.x, res.y, res.z] for res in results.face_landmarks.landmark]).flatten() if results.face_landmarks else np.zeros(468*3)
-#     lh = np.array([[res.x, res.y, res.z] for res in results.left_hand_landmarks.landmark]).flatten() if results.left_hand_landmarks else np.zeros(21*3)
-#     rh = np.array([[res.x, res.y, res.z] for res in results.right_hand_landmarks.landmark]).flatten() if results.right_hand_landmarks else np.zeros(21*3)
-# #     return np.concatenate([pose, face, lh, rh])
-#     return np.concatenate([pose, lh, rh])
-
-
-def getModel(modelPath):
-    model = load_model(modelPath)
-    return model
 
 
 def predict_dslr(model,video_keypoints):
     video_Dimension=[video_keypoints]
     test = np.array(video_Dimension)
     res = model.predict(test)
-    result=actions[np.argmax(res[0])]
+    result=ACTIONS[np.argmax(res[0])]
     return result, np.amax(res)
 
 
@@ -92,57 +96,56 @@ def predict_for_realtime(frames: list, model):
     with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
         for frame in frames:
             _, results = mediapipe_detection(frame, holistic)
-            video_keypoints.append(extract_keypoints(results))
+            video_keypoints.append(extract_keypoints_for_ann_model(results))
         video_keypoints= np.delete(video_keypoints, np.s_[0:132], axis=1)
     return predict_dslr(model, np.array(video_keypoints).mean(0))
 
 
 def predict_for_single_video_file(temp_file_path, model , model_type, number_of_needed_frames):
-    with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
-        video_keypoints = list()
-        cap = cv2.VideoCapture(temp_file_path)
-        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        if total < 30:
-            cap.release()
-            return False, "attached video duration is short"
-        
-        skip=total/number_of_needed_frames
-        next_img=0
-        next_pointer=0
-        counter=0
-        for i in range(0,total):
-            if counter==number_of_needed_frames:
-                break
-            else:
-                _, frame = cap.read()
-                if i == next_img:
-                    _, results = mediapipe_detection(frame, holistic)
-                    video_keypoints.append(extract_keypoints(results))
-                    next_pointer=next_pointer+skip
-                    next_img=int(next_pointer)
-                    counter+=1
-        video_keypoints= np.delete(video_keypoints, np.s_[0:132], axis=1)
-        if model_type=="ann":
-            prediction, predict_proba = predict_dslr(model, np.array(video_keypoints).mean(0))
-        else:
-            prediction, predict_proba = predict_dslr(model, video_keypoints)
+    video_keypoints = list()
+    cap = cv2.VideoCapture(temp_file_path)
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if total < 30:
         cap.release()
-        return True, prediction, predict_proba
+        return False, "attached video duration is short"
+    skip=total/number_of_needed_frames
+    next_img=0
+    next_pointer=0
+    counter=0
+    for i in range(0,total):
+        if counter==number_of_needed_frames:
+            break
+        else:
+            _, frame = cap.read()
+            if i == next_img:
+                with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
+                    _, results = mediapipe_detection(frame, holistic)
+                video_keypoints.append(extract_keypoints_for_ann_model(results))
+                next_pointer=next_pointer+skip
+                next_img=int(next_pointer)
+                counter+=1
+    
+    video_keypoints= np.delete(video_keypoints, np.s_[0:132], axis=1) # removing pose estimation
+    if model_type=="ann":
+        prediction, predict_proba = predict_dslr(model, np.array(video_keypoints).mean(0))
+    else:
+        prediction, predict_proba = predict_dslr(model, video_keypoints)
+    cap.release()
+    return True, prediction, predict_proba
 
-
-def predict_for_single_image(temp_file_path, model, model_type, unused_arg):
+def predict_for_single_image_file(temp_file_path, model, model_type, number_of_needed_frames):
     frame = cv2.imread(temp_file_path)
     keypoints = []
     with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
         _, results = mediapipe_detection(frame, holistic)
-        keypoints.append(extract_keypoints(results))
-        keypoints = keypoints * 30
-        keypoints= np.delete(keypoints, np.s_[0:132], axis=1)
-        if model_type=="ann":
-            prediction, predict_proba = predict_dslr(model, np.array(keypoints).mean(0))
-        else:
-            prediction, predict_proba = predict_dslr(model, keypoints)
-                
+    keypoints.append(extract_keypoints_for_ann_model(results))
+    keypoints = keypoints * number_of_needed_frames
+    keypoints= np.delete(keypoints, np.s_[0:132], axis=1) # removing pose estimation
+
+    if model_type=="ann":
+        prediction, predict_proba = predict_dslr(model, np.array(keypoints).mean(0))
+    else:
+        prediction, predict_proba = predict_dslr(model, keypoints)
 
     return True, prediction, predict_proba
 
