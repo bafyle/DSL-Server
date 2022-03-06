@@ -7,7 +7,7 @@ import os
 import numpy as np
 from django.conf import settings
 
-MODEL = utils.getModel(os.path.join(settings.BASE_DIR, "model_files/DSL_Best_Validation_99T_99V.h5"))
+MODEL = utils.getModel(os.path.join(settings.BASE_DIR, "model_files/annDSL_Best_ValidationDelete.h5"))
 
 class StreamConsumer(AsyncWebsocketConsumer):
 
@@ -22,6 +22,8 @@ class StreamConsumer(AsyncWebsocketConsumer):
     
     # Receive message from WebSocket
     async def receive(self, bytes_data):
+        img = self.decode_opencv_image(bytes_data)
+        cv2.imwrite("ay7aga.jpg", img)
         """
             Upon receiving a frame from the client, we decode that frame
             and store it in a buffer
@@ -44,7 +46,7 @@ class StreamConsumer(AsyncWebsocketConsumer):
             self.buffer.clear()
 
 
-    def decode_opencv_image(self, img_stream, cv2_img_flag=0):
+    def decode_opencv_image(self, img_stream, cv2_img_flag=1):
         img_array = np.asarray(bytearray(img_stream), dtype=np.uint8)
         data = cv2.imdecode(img_array, cv2_img_flag)
         return data

@@ -14,7 +14,7 @@ from .utils import (
 import os
 import logging
 
-MODEL = getModel(os.path.join(settings.BASE_DIR, "model_files/DSL_Best_Validation_99T_99V.h5"))
+MODEL = getModel(os.path.join(settings.BASE_DIR, "model_files/annDSL_Best_ValidationDelete.h5"))
 
 file_type_prediction_dict = {"video": predict_for_single_video_file, "image": predict_for_single_image}
 
@@ -38,7 +38,7 @@ def upload_media_view(request: HttpRequest):
             new_file.write(line)
             new_file.flush()
     
-    output = prediction_function(temp_file_path, MODEL)
+    output = prediction_function(temp_file_path, MODEL, "ann", 30)
     
     try:
         os.remove(temp_file_path)
