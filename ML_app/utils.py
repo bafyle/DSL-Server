@@ -83,6 +83,47 @@ def extract_keypoints_for_ann_model(results):
     return np.concatenate([pose, lh, rh])
 
 
+
+
+
+
+def is_action(results):
+
+# chech if there are any hands
+    if not results.left_hand_landmarks and not results.right_hand_landmarks:
+        return False
+
+    # get the y axis for each keypoint in the hand
+    # if no hand then give the keypoint large value (10)
+    lh = np.array([[res.y] for res in results.left_hand_landmarks.landmark]).flatten() if results.left_hand_landmarks else np.full((21), 10)
+    rh = np.array([[res.y] for res in results.right_hand_landmarks.landmark]).flatten() if results.right_hand_landmarks else np.full((21), 10)
+
+
+
+    # Get the max value in each hand
+    # Hint: A large value means it goes down the image.
+    maxval_lh = np.max(lh)
+    maxval_rh = np.max(rh)
+
+    # get the y axis values for left_hip and right_hip
+    left_hip=results.pose_landmarks.landmark[23].y
+    right_hip=results.pose_landmarks.landmark[24].y
+
+    # get the minimum on
+    # Hint: A minimum value means it goes up the image.
+    min_hip=min(left_hip,right_hip)
+
+    # check if the minimmum value from the hands is greater than the hip
+    # if true it means all hands are below the hip
+    if min(maxval_lh,maxval_rh) > min_hip :
+        return False
+
+    return True
+
+
+
+
+
 def predict_dslr(model,video_keypoints):
     video_Dimension=[video_keypoints]
     test = np.array(video_Dimension)
@@ -93,10 +134,14 @@ def predict_dslr(model,video_keypoints):
 
 def predict_for_realtime(frames: list, model):
     video_keypoints = list()
+    are_actions = []
     with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
         for frame in frames:
             _, results = mediapipe_detection(frame, holistic)
+            are_actions.append(is_action(results))
             video_keypoints.append(extract_keypoints_for_ann_model(results))
+        if are_actions.count(False) > len(frames) / 1.5:
+            return "No Action", 100
         video_keypoints= np.delete(video_keypoints, np.s_[0:132], axis=1)
     return predict_dslr(model, np.array(video_keypoints).mean(0))
 
@@ -105,7 +150,8 @@ def predict_for_single_video_file(temp_file_path, model , model_type, number_of_
     video_keypoints = list()
     cap = cv2.VideoCapture(temp_file_path)
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    if total < 30:
+    are_actions = []
+    if total < number_of_needed_frames:
         cap.release()
         return False, "attached video duration is short"
     skip=total/number_of_needed_frames
@@ -120,11 +166,13 @@ def predict_for_single_video_file(temp_file_path, model , model_type, number_of_
             if i == next_img:
                 with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
                     _, results = mediapipe_detection(frame, holistic)
+                are_actions.append(is_action(results))
                 video_keypoints.append(extract_keypoints_for_ann_model(results))
                 next_pointer=next_pointer+skip
                 next_img=int(next_pointer)
                 counter+=1
-    
+    if are_actions.count(False) > number_of_needed_frames /  1.2:
+        return True, "No Action", 1
     video_keypoints= np.delete(video_keypoints, np.s_[0:132], axis=1) # removing pose estimation
     if model_type=="ann":
         prediction, predict_proba = predict_dslr(model, np.array(video_keypoints).mean(0))
@@ -138,14 +186,18 @@ def predict_for_single_image_file(temp_file_path, model, model_type, number_of_n
     keypoints = []
     with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
         _, results = mediapipe_detection(frame, holistic)
-    keypoints.append(extract_keypoints_for_ann_model(results))
-    keypoints = keypoints * number_of_needed_frames
-    keypoints= np.delete(keypoints, np.s_[0:132], axis=1) # removing pose estimation
+        if is_action(results): 
+            keypoints.append(extract_keypoints_for_ann_model(results)) 
+            keypoints = keypoints * number_of_needed_frames
+            keypoints= np.delete(keypoints, np.s_[0:132], axis=1) # removing pose estimation
 
-    if model_type=="ann":
-        prediction, predict_proba = predict_dslr(model, np.array(keypoints).mean(0))
-    else:
-        prediction, predict_proba = predict_dslr(model, keypoints)
+            if model_type=="ann":
+                prediction, predict_proba = predict_dslr(model, np.array(keypoints).mean(0))
+            else:
+                prediction, predict_proba = predict_dslr(model, keypoints)
+        else:
+            prediction="No Action"
+            predict_proba =1
 
     return True, prediction, predict_proba
 
