@@ -36,9 +36,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     ## third party apps
-
     'channels',
-    # 'rest_framework',
 
     ## My apps
     'ML_app',
