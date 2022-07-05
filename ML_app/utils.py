@@ -1,13 +1,23 @@
+from uuid import uuid4
+import magic
+import logging
 import cv2
 import numpy as np
 import mediapipe as mp
 from keras.models import load_model
 import os
+import enum
 from django.conf import settings
 
 def getModel(modelPath):
     model = load_model(modelPath)
     return model
+
+
+class ModelType(enum.Enum):
+    ANN = 1,
+    RNN = 2
+
 
 MODEL = getModel(os.path.join(settings.BASE_DIR, "model_files/annDSL_Best_ValidationDelete.h5"))
 ACTIONS = [
@@ -125,9 +135,9 @@ def is_action(results):
 
 
 def predict_dslr(model,video_keypoints):
-    video_Dimension=[video_keypoints]
-    test = np.array(video_Dimension)
-    res = model.predict(test)
+    video_dimensions=[video_keypoints]
+    video_dimensions_nparray = np.array(video_dimensions)
+    res = model.predict(video_dimensions_nparray)
     result=ACTIONS[np.argmax(res[0])]
     return result, np.amax(res)
 
@@ -146,7 +156,7 @@ def predict_for_realtime(frames: list, model):
     return predict_dslr(model, np.array(video_keypoints).mean(0))
 
 
-def predict_for_single_video_file(temp_file_path, model , model_type, number_of_needed_frames):
+def predict_for_single_video_file(temp_file_path, model , model_type: ModelType, number_of_needed_frames):
     video_keypoints = list()
     cap = cv2.VideoCapture(temp_file_path)
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -174,14 +184,15 @@ def predict_for_single_video_file(temp_file_path, model , model_type, number_of_
     if are_actions.count(False) > number_of_needed_frames /  1.2:
         return True, "No Action", 1
     video_keypoints= np.delete(video_keypoints, np.s_[0:132], axis=1) # removing pose estimation
-    if model_type=="ann":
+    if model_type==ModelType.ANN:
         prediction, predict_proba = predict_dslr(model, np.array(video_keypoints).mean(0))
-    else:
+    elif model_type == ModelType.RNN:
         prediction, predict_proba = predict_dslr(model, video_keypoints)
     cap.release()
     return True, prediction, predict_proba
 
-def predict_for_single_image_file(temp_file_path, model, model_type, number_of_needed_frames):
+
+def predict_for_single_image_file(temp_file_path, model, model_type: ModelType, number_of_needed_frames):
     frame = cv2.imread(temp_file_path)
     keypoints = []
     with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
@@ -190,10 +201,9 @@ def predict_for_single_image_file(temp_file_path, model, model_type, number_of_n
             keypoints.append(extract_keypoints_for_ann_model(results)) 
             keypoints = keypoints * number_of_needed_frames
             keypoints= np.delete(keypoints, np.s_[0:132], axis=1) # removing pose estimation
-
-            if model_type=="ann":
+            if model_type == ModelType.ANN:
                 prediction, predict_proba = predict_dslr(model, np.array(keypoints).mean(0))
-            else:
+            elif model_type == ModelType.RNN:
                 prediction, predict_proba = predict_dslr(model, keypoints)
         else:
             prediction="No Action"
@@ -201,3 +211,23 @@ def predict_for_single_image_file(temp_file_path, model, model_type, number_of_n
 
     return True, prediction, predict_proba
 
+
+def get_random_file_name_and_path():
+    file_name = str(uuid4())
+    return file_name, settings.MEDIA_ROOT + file_name
+
+def get_file_type(uploaded_file):
+    return magic.from_buffer(uploaded_file.read(2048), mime=True).split("/")[0]
+
+
+def save_file(temp_file_path: str, uploaded_file):
+    with open(temp_file_path, "wb") as new_file:
+        for line in uploaded_file:
+            new_file.write(line)
+            new_file.flush()
+
+def delete_file(temp_file_path: str):
+    try:
+        os.remove(temp_file_path)
+    except (FileNotFoundError, PermissionError) as e:
+        logging.warning(f"file: {temp_file_path} was not deleted due to {e.strerror}")
