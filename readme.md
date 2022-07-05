@@ -1,12 +1,12 @@
-# Sign Language Django Server
+# Dynamic Sign Language Back-end Server
 
-This Django application process the received data (images and videos) from the client and apply any necessary preprocessing before the model prediction.
+My graduation project back-end server. It serves the incoming request that has a media file attached to it, apply the preprocessing pipeline, and finally return to the client a response with a predicted sign language vocabulary. In addition to a websocket endpoint to provide a real-time prediction.
 
-### Apps
-For now, the server has only two apps, chat app which is an example for django channels and websocket and ML_app which has the MODEL and the prediction function and endpoints.
-chat is disabled and will be removed in the future
+### Technologies
+This server is built using Django Framework and Django channels library.
+For now, the server has only one app: ML_app. Which has the model and the prediction process and endpoints.
 
-### Server endpoints
+### Server Endpoints
 This project has two endpoints (for now) which are:
 ~~~
 http://host:port/api/upload-media/
@@ -14,13 +14,4 @@ ws://host:port/real-time/
 ~~~
 http endpoints used to upload an image or a video to the server and the response of it is the the prediction of the model or and error message, All in JSON format.
 
-websocket endpoint is used for sending a stream of frames from opencv and send back to the client the prediction.
-
-### Future Thinking
---
-
-
-### Todo
- * [x] Make sure the model works before integrate it into the server
- * [x] Make a dummy response to insure that websocket works as intended
- * [x] Integrate the model to the server and test it
+ws endpoint (websocket) is used for sending a stream of video frames and send back to the client the prediction.
